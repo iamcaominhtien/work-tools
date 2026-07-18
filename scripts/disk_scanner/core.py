@@ -130,9 +130,10 @@ cdef ScanResult _scan_dir_c(bytes path_b, str path_str, str name,
 
             if isdir:
                 dir_key = (st.st_dev, st.st_ino)
-                if dir_key in visited_dirs:
-                    continue
-                visited_dirs.add(dir_key)
+                if st.st_ino != 0:
+                    if dir_key in visited_dirs:
+                        continue
+                    visited_dirs.add(dir_key)
 
                 child = _scan_dir_c(child_path_b, child_path_str, child_name,
                                      stats, min_size, follow_symlinks, progress_cb,
@@ -173,7 +174,8 @@ def scan_directory_fast(str root_path, int64_t min_size=0,
     if visited_dirs is None:
         visited_dirs = set()
     if lstat(path_b, &root_st) == 0:
-        visited_dirs.add((root_st.st_dev, root_st.st_ino))
+        if root_st.st_ino != 0:
+            visited_dirs.add((root_st.st_dev, root_st.st_ino))
     root = _scan_dir_c(path_b, root_path, name, stats, min_size, follow_symlinks, progress_cb, visited_dirs)
     return root, stats
 """
@@ -268,7 +270,8 @@ def scan_directory_pure_python(
         visited_dirs = set()
         try:
             root_stat = os.lstat(path)
-            visited_dirs.add((root_stat.st_dev, root_stat.st_ino))
+            if root_stat.st_ino != 0:
+                visited_dirs.add((root_stat.st_dev, root_stat.st_ino))
         except OSError:
             pass
 
@@ -300,7 +303,7 @@ def scan_directory_pure_python(
                 except OSError:
                     dir_key = None
 
-                if dir_key is not None:
+                if dir_key is not None and entry_stat.st_ino != 0:
                     if dir_key in visited_dirs:
                         continue
                     visited_dirs.add(dir_key)
